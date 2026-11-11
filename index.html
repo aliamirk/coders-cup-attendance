@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1d4ed8">
+<title>Coders Cup · Attendance</title>
+<style>
+:root{--b1:#1d4ed8;--b2:#38bdf8;--bg:#f4f8ff;--card:#fff;--ink:#0f1d3a;--mute:#5b6b8c;--line:#dbe6fb;--r:14px}
+*{box-sizing:border-box;margin:0}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh}
+header{background:linear-gradient(135deg,var(--b1),var(--b2));color:#fff;padding:calc(12px + env(safe-area-inset-top)) 12px 14px;position:sticky;top:0;z-index:5;box-shadow:0 4px 16px #1d4ed833}
+.bar{max-width:720px;margin:auto;display:flex;align-items:center;gap:8px}
+header h1{font-size:1.05rem;flex:1}header small{display:block;opacity:.85;font-weight:400;font-size:.75rem}
+main{max-width:720px;margin:auto;padding:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px;box-shadow:0 1px 3px #1d4ed814}
+button,.btn{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:10px 14px;font-weight:600;text-decoration:none;display:inline-block}
+.primary{background:linear-gradient(135deg,var(--b1),var(--b2));color:#fff;box-shadow:0 3px 10px #1d4ed844}
+.ghost{background:#e8f0ff;color:var(--b1)}
+.icon{background:#ffffff2e;color:#fff;padding:8px 12px}
+.day{text-align:center;cursor:pointer;transition:.15s;padding:12px 4px}
+.day:hover,.item:hover{border-color:var(--b2);transform:translateY(-1px)}
+.day b{display:block;font-size:1.5rem;background:linear-gradient(135deg,var(--b1),var(--b2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.day span{font-size:.75rem;color:var(--mute)}
+.list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.item{cursor:pointer;transition:.15s;border-left:4px solid var(--b2)}
+.item h3{font-size:1rem}.meta{color:var(--mute);font-size:.85rem;margin-top:4px;display:flex;gap:12px;flex-wrap:wrap}
+.badge{background:#e8f0ff;color:var(--b1);border-radius:99px;padding:2px 10px;font-size:.75rem;font-weight:700;float:right}
+.row{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-bottom:4px}
+.row h2{font-size:1.05rem}
+.empty{text-align:center;color:var(--mute);padding:28px 8px}
+.team b{display:block}.team p{color:var(--mute);font-size:.88rem;margin-top:3px}
+dialog{border:0;border-radius:var(--r);padding:16px;width:min(92vw,420px);margin:auto;box-shadow:0 20px 50px #0f1d3a40}
+dialog::backdrop{background:#0f1d3a66;backdrop-filter:blur(2px)}
+dialog h3{margin-bottom:10px}
+label{display:block;font-size:.8rem;font-weight:600;color:var(--mute);margin:10px 0 4px}
+input{font:inherit;width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:#f9fbff}
+input:focus{outline:2px solid var(--b2);border-color:transparent}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+#toast{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-size:.9rem;opacity:0;transition:.25s;pointer-events:none;max-width:90vw;z-index:20}
+#toast.show{opacity:1}#toast.err{background:#b91c1c}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<header><div class="bar">
+  <button class="icon hide" id="back" aria-label="Back">←</button>
+  <h1 id="title">Coders Cup<small id="sub">Attendance tracker</small></h1>
+  <a class="btn icon hide" id="dl" title="Download Excel">⬇ Excel</a>
+</div></header>
+<main id="app"></main>
+
+<dialog id="dComp"><form method="dialog" id="fComp">
+  <h3>New competition</h3>
+  <label>Competition name</label><input name="name" required maxlength="60">
+  <label>Venue</label><input name="venue" required maxlength="60">
+  <div class="two"><div><label>From</label><input type="time" name="from" required></div><div><label>To</label><input type="time" name="to" required></div></div>
+  <div class="actions"><button type="button" class="ghost" data-close>Cancel</button><button class="primary">Add</button></div>
+</form></dialog>
+
+<dialog id="dTeam"><form method="dialog" id="fTeam">
+  <h3>Add team</h3>
+  <label>Team name</label><input name="team" required maxlength="60">
+  <label>Member 1</label><input name="m1" required maxlength="60">
+  <label>Member 2 (optional)</label><input name="m2" maxlength="60">
+  <label>Member 3 (optional)</label><input name="m3" maxlength="60">
+  <div class="actions"><button type="button" class="ghost" data-close>Cancel</button><button class="primary">Mark present</button></div>
+</form></dialog>
+<div id="toast"></div>
+
+<script>
+const $=s=>document.querySelector(s), app=$("#app");
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const dayName=d=>new Date(2026,10,d).toLocaleDateString("en",{weekday:"short"});
+let comps=[];
+
+function toast(m,err){const t=$("#toast");t.textContent=m;t.className="show"+(err?" err":"");clearTimeout(toast.t);toast.t=setTimeout(()=>t.className="",2600)}
+async function api(qs,body){
+  const r=await fetch("/api"+qs,body?{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}:{});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(j.error||"Request failed");
+  return j;
+}
+function head(title,sub,back,day){
+  $("#title").firstChild.textContent=title;$("#sub").textContent=sub;
+  $("#back").classList.toggle("hide",!back);$("#back").onclick=()=>location.hash=back;
+  const dl=$("#dl");dl.classList.toggle("hide",!day);if(day)dl.href=`/api?day=${day}&download=1`;
+}
+
+async function render(){
+  const [,d,c]=location.hash.slice(1).split("/");
+  const day=Number(d);
+  if(!day){
+    head("Coders Cup","Select a day · November 2026","");
+    app.innerHTML=`<div class="grid">${Array.from({length:14},(_,i)=>i+12).map(n=>`<div class="card day" onclick="location.hash='#/${n}'"><span>${dayName(n)}</span><b>${n}</b><span>Nov</span></div>`).join("")}</div>`;
+    return;
+  }
+  app.innerHTML=`<p class="empty">Loading…</p>`;
+  try{comps=(await api("?day="+day)).competitions}catch(e){app.innerHTML=`<p class="empty">${esc(e.message)}</p>`;return}
+  const comp=c&&comps.find(x=>x.id===decodeURIComponent(c));
+  if(comp){
+    head(comp.name,`${comp.venue} · ${comp.time}`,"#/"+day,day);
+    app.innerHTML=`<div class="row"><h2>Present teams (${comp.teams.length})</h2><button class="primary" id="addT">+ Add team</button></div>
+    <div class="list">${comp.teams.length?comp.teams.map(t=>`<div class="card team"><b>${esc(t.team)}</b><p>${t.members.map(esc).join(" · ")}</p><p>${esc(t.at)}</p></div>`).join(""):`<p class="empty">No teams marked present yet.</p>`}</div>`;
+    $("#addT").onclick=()=>{$("#fTeam").reset();$("#dTeam").showModal()};
+  }else{
+    head(`${d} Nov`,dayName(day)+" · competitions","#/",day);
+    app.innerHTML=`<div class="row"><h2>Competitions (${comps.length})</h2><button class="primary" id="addC">+ New</button></div>
+    <div class="list">${comps.length?comps.map(x=>`<div class="card item" onclick="location.hash='#/${day}/${encodeURIComponent(x.id)}'"><span class="badge">${x.teams.length} teams</span><h3>${esc(x.name)}</h3><div class="meta"><span>📍 ${esc(x.venue)}</span><span>🕒 ${esc(x.time)}</span></div></div>`).join(""):`<p class="empty">No competitions yet. Add the first one.</p>`}</div>`;
+    $("#addC").onclick=()=>{$("#fComp").reset();$("#dComp").showModal()};
+  }
+}
+
+document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>b.closest("dialog").close());
+async function submit(form,dlg,payload,msg){
+  const btn=form.querySelector(".primary");btn.disabled=true;
+  try{await api("",payload);dlg.close();toast(msg);await render()}
+  catch(e){toast(e.message,true)}finally{btn.disabled=false}
+}
+$("#fComp").onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);
+  submit(e.target,$("#dComp"),{action:"addComp",day:+location.hash.split("/")[1],name:f.get("name"),venue:f.get("venue"),time:`${f.get("from")} - ${f.get("to")}`},"Competition added")};
+$("#fTeam").onsubmit=e=>{e.preventDefault();const f=new FormData(e.target),[,d,c]=location.hash.slice(1).split("/");
+  submit(e.target,$("#dTeam"),{action:"addTeam",day:+d,comp:decodeURIComponent(c),team:f.get("team"),members:[f.get("m1"),f.get("m2"),f.get("m3")]},"Team marked present")};
+addEventListener("hashchange",render);render();
+</script>
+</body>
+</html>

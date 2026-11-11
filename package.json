@@ -1,0 +1,6 @@
+{
+  "name": "coders-cup-attendance",
+  "private": true,
+  "type": "module",
+  "dependencies": { "@netlify/blobs": "^8.1.0", "exceljs": "^4.4.0" }
+}
